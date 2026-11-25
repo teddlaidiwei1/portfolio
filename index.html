@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta name="robots" content="noindex, nofollow">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tedd Lai</title>
+<meta name="description" content="Tedd Lai, Year 2 Digital Media and Communications student at Singapore Polytechnic. Meta ads and the video ads for them, 3D simulation reels on his own channel, and the AI pipeline he built to make the reels.">
+<meta name="theme-color" content="#FFC93C">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%2715%27 fill=%27%2329A8C9%27/%3E%3Cpath d=%27M5 11c5-6 13-6 17-2s3 9-2 9-8-6-15-7z%27 fill=%27%237CCB5B%27/%3E%3C/svg%3E">
+<script>
+  /* The window's shape decides the layout before anything paints (site.js keeps it up to date). */
+  (function (d) {
+    d.className += ' js';
+    var w = innerWidth, h = innerHeight;
+    d.setAttribute('data-layout', w < 600 ? 'phone' : (w / h >= 1.3 && w >= 900 ? 'wide' : 'tall'));
+    d.setAttribute('data-field', 'hero');
+  })(document.documentElement);
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap">
+<link rel="stylesheet" href="css/site.css">
+<script>
+  /* the three places the camera dives into (the drive-in at Meta ads, Marina Bay at tinyworld, the factory at the AI
+     pipeline); world.js builds them ahead in idle time (r13 pass A) */
+  window.WORLD_SCENES = ['tinyworld', 'films', 'workflow'];
+</script>
+<script defer src="vendor/three.bundle.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script defer src="js/world.js"></script>
+<script defer src="js/sfx.js"></script>
+<script defer src="js/site.js"></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to the work</a>
+
+<!-- Flat colour fields, one per section in page order, grown from the planet by site.js. Always behind the planet and the text. -->
+<div class="fields" aria-hidden="true">
+  <div class="field" data-field-for="hero"></div>
+  <div class="field" data-field-for="films"></div>
+  <div class="field" data-field-for="tinyworld"></div>
+  <div class="field" data-field-for="workflow"></div>
+  <div class="field" data-field-for="bwgu"></div>
+  <div class="field" data-field-for="about"></div>
+  <div class="field" data-field-for="contact"></div>
+</div>
+<div class="world-layer" id="world-layer" aria-hidden="true"></div>
+<!-- The stage: the rectangle the 3D is drawn in. site.js keeps it on the stage and names the place in view. -->
+<div class="stage" id="stage" role="img" aria-label="Tedd's tinyworld planet: a small low-poly globe with a guy in a yellow shirt standing on top"></div>
+
+<!-- With no 3D, the stage shows each section's real picture instead (site.js adds the pictures only then). -->
+<div class="stills" id="stills" aria-hidden="true"></div>
+
+<!-- The HUD, in his reel layout: a short-lived message on the left, the run on the right. -->
+<div class="hud" id="hud" aria-hidden="true">
+  <div class="hud-item hud-left is-empty" id="hud-left"><p class="hud-v"><span></span></p><p class="hud-c"></p></div>
+  <div class="hud-item hud-right" id="hud-right"><p class="hud-v"><span>0.0 km</span></p><p class="hud-c">Scroll to run. This page is 42.195&nbsp;km long.</p></div>
+</div>
+
+<header class="site-head" id="site-head">
+  <nav class="nav" aria-label="Main">
+    <a href="#ads">Work</a>
+    <a href="#about">About</a>
+    <a href="#contact">Contact</a>
+    <button class="sound-toggle" type="button" data-sfx-toggle aria-pressed="false">Sound off</button>
+    <button class="button button--head" type="button" id="qv-open" aria-haspopup="dialog" aria-controls="quick-view">Quick view</button>
+  </nav>
+  <p class="status">Open for internships. Singapore<span class="status-t" hidden>, <time id="sg-time"></time></span></p>
+</header>
+
+<div class="page" id="page">
+<main id="main">
+
+  <!-- ============ Hero: the world stands on the name ============ -->
+  <section class="hero sec--hero" id="top" data-stop="hero" aria-label="Introduction">
+    <!-- P5: his photo stands behind the end of his name (the name is drawn over his chest), the planet in front of
+         his shoulder; site.js places it so his face is clear of every word, the header, the run readout and the 3D -->
+    <picture class="hero-photo">
+      <source type="image/webp" srcset="img/tedd-cut-420.webp 420w, img/tedd-cut.webp 632w" sizes="(max-width: 600px) 260px, 34vw">
+      <img src="img/tedd-cut.png" width="632" height="741" alt="Tedd Lai" decoding="async" fetchpriority="high">
+    </picture>
+    <!-- the name sits on the layer under the 3D; the planet stands on its top edge -->
+    <h1 class="name" aria-label="Tedd Lai"><span class="name-first" aria-hidden="true"><i class="name-base"></i><span class="ch">T</span><span class="ch">e</span><span class="ch">d</span><span class="ch">d</span></span> <span class="name-last" aria-hidden="true"><span class="ch">L</span><span class="ch">a</span><span class="ch">i</span></span></h1>
+    <div class="hero-frame">
+      <div class="hero-inner">
+        <!-- Round 8 (Tedd, 22 Nov): the two numbers ARE the headline; the small figure tiles under it are gone -->
+        <h2 class="headline">30+ Meta ad campaigns<br> 800,000+ views in month&nbsp;one</h2>
+        <div class="bio">
+          <p class="body-copy">I run Meta ads and make the video ads. The views are from tinyworld, my own 3D reel channel.</p>
+          <p class="body-copy">I&rsquo;m Tedd, a Year 2 Digital Media &amp; Communications student at Singapore Polytechnic, looking for a digital marketing internship.</p>
+        </div>
+        <div class="hero-actions">
+          <a class="button hero-button" href="#ads" data-sfx-primary>See the work</a>
+          <a class="button button--quiet hero-email" href="#contact">Email me</a>
+        </div>
+        <!-- r13 pass B: the work on the first screen, W+K style: still covers that link to their sections -->
+        <ul class="hero-work" role="list">
+          <li><a class="hw hw--45" href="#ads" aria-label="Meta ads I planned, made and tested."><img src="img/covers/ad-5-s.jpg" width="320" height="400" alt="" decoding="async" fetchpriority="low"></a></li>
+          <li><a class="hw hw--45" href="#ads" aria-label="Meta ads I planned, made and tested."><img src="img/covers/ad-3-s.jpg" width="320" height="400" alt="" decoding="async" fetchpriority="low"></a></li>
+          <li><a class="hw hw--916" href="#ads" aria-label="Meta ads I planned, made and tested."><img src="img/covers/ad-1-s.jpg" width="225" height="400" alt="" decoding="async" fetchpriority="low"></a></li>
+          <li><a class="hw hw--916" href="#tinyworld" aria-label="tinyworld, my own &ldquo;What if...?&rdquo; channel."><img src="img/covers/tw-gorilla-s.jpg" width="225" height="400" alt="" decoding="async" fetchpriority="low"></a></li>
+          <li><a class="hw hw--916" href="#tinyworld" aria-label="tinyworld, my own &ldquo;What if...?&rdquo; channel."><img src="img/covers/tw-earth-s.jpg" width="225" height="400" alt="" decoding="async" fetchpriority="low"></a></li>
+          <li><a class="hw hw--916" href="#tinyworld" aria-label="tinyworld, my own &ldquo;What if...?&rdquo; channel."><img src="img/covers/tw-typhoon-s.jpg" width="225" height="400" alt="" decoding="async" fetchpriority="low"></a></li>
+        </ul>
+      </div>
+    </div>
+    <img class="sec-still sec-still--logo" src="img/world-fallback.png" width="1080" height="1080" loading="lazy" decoding="async"
+         alt="Tedd's tinyworld logo: a small low-poly planet with a guy in a yellow shirt standing on top">
+  </section>
+
+  <!-- ============ Meta ads and the video ads, one section (the drive-in place in the 3D) ============ -->
+  <!-- P6: the old Meta ads section and the old Video ads section in one. Both old anchors land here: #ads on the
+       column, #films on its inner box (same top). -->
+  <section class="sec sec--films" data-stop="films" aria-labelledby="ads-h">
+    <img class="sec-still" src="video/ads/ad-3.jpg" width="720" height="900" loading="lazy" decoding="async" alt="">
+    <div class="col" id="ads">
+     <div class="col-in" id="films">
+      <h2 id="ads-h" class="poster-h" tabindex="-1">Meta ads I planned, made and tested.</h2>
+      <div class="films-poster" role="group" aria-label="Four of my video ads: the first two as a before and after, with the reason for the change">
+        <ul class="ad-tiles ad-pair" role="list" data-proof>
+          <li class="ad-tile ad-tile--45 ad-tile--feat">
+            <button class="clip clip--ad" type="button" data-full="video/ads/ad-5-full.mp4" aria-label="Watch with sound: the first ad, a guide to five upcoming launches (4:5 feed)">
+              <video muted loop playsinline preload="none" data-poster="video/ads/ad-5.jpg" width="720" height="900" src="video/ads/ad-5.mp4"></video><noscript><img src="video/ads/ad-5.jpg" width="720" height="900" alt=""></noscript>
+            </button>
+            <p class="ad-k"><span class="ad-kd">5 Oct</span>Ran first</p>
+            <p class="ad-c">A guide to five upcoming launches.</p>
+            <p class="ad-tag">4:5 feed</p>
+          </li>
+          <li class="ad-tile ad-tile--45 ad-tile--feat ad-tile--after">
+            <button class="clip clip--ad" type="button" data-full="video/ads/ad-3-full.mp4" aria-label="Watch with sound: the second ad, which opens on one question, Upgrading from your HDB? (4:5 feed)">
+              <video muted loop playsinline preload="none" data-poster="video/ads/ad-3.jpg" width="720" height="900" src="video/ads/ad-3.mp4"></video><noscript><img src="video/ads/ad-3.jpg" width="720" height="900" alt=""></noscript>
+            </button>
+            <p class="ad-k"><span class="ad-kd">24 Oct</span>Tested beside it</p>
+            <p class="ad-c">Opens on one question: &ldquo;Upgrading from your HDB?&rdquo;</p>
+            <p class="ad-tag">4:5 feed</p>
+          </li>
+        </ul>
+        <p class="ba-why" data-small>With the launches about to open, I tested a second ad beside the first in the same campaign.</p>
+
+        <div class="more-ads">
+          <div class="films-words" data-small>
+            <dl class="stat-row stat-row--ads">
+              <div class="stat stat--mega"><dt data-count>30+</dt><dd>campaigns for a real estate business, 2020 to 2026</dd></div>
+            </dl>
+          </div>
+          <ul class="ad-tiles ad-more" role="list" data-proof>
+            <li class="ad-tile ad-tile--916">
+              <button class="clip clip--ad" type="button" aria-label="Play or pause: the ad that shows the walk to the MRT on a real map (9:16 Reels and Stories)">
+                <video muted loop playsinline preload="none" data-poster="video/ads/ad-4.jpg" width="720" height="1280" src="video/ads/ad-4.mp4"></video><noscript><img src="video/ads/ad-4.jpg" width="720" height="1280" alt=""></noscript>
+              </button>
+              <p class="ad-c">Shows the walk to the MRT on a real map.</p>
+              <p class="ad-tag">9:16 Reels and Stories</p>
+            </li>
+            <li class="ad-tile ad-tile--916">
+              <button class="clip clip--ad" type="button" data-full="video/ads/ad-1-full.mp4" aria-label="Watch with sound: the ad that leads with one fact about the area (9:16 Reels and Stories)">
+                <video muted loop playsinline preload="none" data-poster="video/ads/ad-1.jpg" width="720" height="1280" src="video/ads/ad-1.mp4"></video><noscript><img src="video/ads/ad-1.jpg" width="720" height="1280" alt=""></noscript>
+              </button>
+              <p class="ad-c">Leads with one fact about the area.</p>
+              <p class="ad-tag">9:16 Reels and Stories</p>
+            </li>
+          </ul>
+          <div class="more-ads-copy">
+            <p class="small-note ad-hint" data-small>Press an ad to watch it with sound.</p>
+            <div class="small-two ads-lines" data-small>
+              <p class="body-copy small-col">I plan who to reach, write the copy, build the lead form and make the video.</p>
+              <p class="body-copy small-col">For the ads I also use Higgsfield for AI video shots, Blender for 3D and CapCut for the edit.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tests-block">
+        <h3 class="sub-h">What testing taught me</h3>
+        <ul class="tests">
+          <li><p class="test-t">Check the phone number.</p><p class="body-copy">A form with no checks brought taps, not people. Now every form checks the number by text.</p></li>
+          <li><p class="test-t">Change one thing, then wait.</p><p class="body-copy">I once changed a campaign four times in twelve days. Now it is one change, then two weeks alone.</p></li>
+          <li><p class="test-t">Lead with proof nobody else has.</p><p class="body-copy">Rival ads all used the same few layouts, so mine start with something only this business can say.</p></li>
+        </ul>
+      </div>
+
+      <div class="proof-block">
+        <h3 class="sub-h">My lead form and my change log</h3>
+        <div class="proof-two">
+      <figure class="dg dg-form">
+        <ol class="form-screens">
+          <li><div class="scr"><p class="dg-l">Repeats the ad&rsquo;s promise</p></div></li>
+          <li><div class="scr scr--q"><p class="dg-l">Sorts who can buy, and when</p><p class="s-q">Home size</p><p class="s-q">Which launch</p><p class="s-q">Singapore citizen?</p><p class="s-q">When are you buying?</p></div></li>
+          <li><div class="scr"><p class="dg-l">Phone number checked by text</p></div></li>
+          <li><div class="scr"><p class="dg-l">A screen to check before sending</p></div></li>
+          <li><div class="scr"><p class="dg-l">A button to chat</p></div></li>
+        </ol>
+        <p class="form-no">No income question.</p>
+        <figcaption>A wireframe of my lead form. No real enquiries shown.</figcaption>
+      </figure>
+      <figure class="dg dg-log">
+        <table class="log">
+          <thead><tr><th scope="col">Date</th><th scope="col">What changed</th></tr></thead>
+          <tbody>
+            <tr><td>5 Oct</td><td>First video ad, new form, legal line added</td></tr>
+            <tr><td>16 Oct</td><td>Relaunched, changing what the campaign aims for</td></tr>
+            <tr class="is-mark"><td>21 Oct</td><td>Location, form and ad text, all on one day (my mistake: three changes at once)</td></tr>
+            <tr><td>21 Oct</td><td>Audience widened to all of Singapore</td></tr>
+            <tr><td>22 Oct</td><td>Form linked to a sheet and a phone alert</td></tr>
+            <tr><td>24 Oct</td><td>Two videos side by side</td></tr>
+            <tr><td>27 Oct</td><td>Sheet link found broken, reconnected</td></tr>
+            <tr><td>28 Oct</td><td>Age range widened, then campaign paused</td></tr>
+            <tr><td>18 Nov</td><td>New campaign: one ad set, three ads, hands off</td></tr>
+          </tbody>
+        </table>
+        <figcaption>Part of my log from October and November 2026. The numbers stay private.</figcaption>
+      </figure>
+        </div>
+      </div>
+     </div>
+    </div>
+  </section>
+
+  <!-- ============ tinyworld ============ -->
+  <section class="sec sec--tinyworld" data-stop="tinyworld" aria-labelledby="tw-h">
+    <img class="sec-still" src="img/tw-gorilla.jpg" width="720" height="1280" loading="lazy" decoding="async" alt="">
+    <div class="col" id="tinyworld">
+     <div class="col-in">
+      <h2 id="tw-h" class="poster-h" tabindex="-1">tinyworld, my own &ldquo;What if...?&rdquo; channel.</h2>
+      <dl class="stat-row stat-row--tw" data-proof>
+        <div class="stat stat--mega"><dt id="views-figure" data-count>800,000+</dt><dd><span id="views-caption">views in the first month</span> <a class="text-link" href="https://www.instagram.com/tinyworld.sim/" target="_blank" rel="noopener">See @tinyworld.sim on Instagram</a></dd></div>
+      </dl>
+
+      <ul class="reels" aria-label="Four tinyworld reels" data-proof>
+        <li class="reel">
+          <button class="clip clip--reel" type="button" data-slug="gorilla" aria-label="Play the reel: What if you had to fight a silverback gorilla?">
+            <video muted loop playsinline preload="none" data-poster="img/tw-gorilla.jpg" width="540" height="960" src="video/tw-gorilla.mp4"></video><noscript><img src="img/tw-gorilla.jpg" width="540" height="960" alt=""></noscript>
+          </button>
+          <p class="reel-t">What if you had to fight a silverback gorilla?</p>
+        </li>
+        <li class="reel">
+          <button class="clip clip--reel" type="button" data-slug="gravity" aria-label="Play the reel: What if the world lost gravity?">
+            <video muted loop playsinline preload="none" data-poster="img/tw-gravity.jpg" width="540" height="960" src="video/tw-gravity.mp4"></video><noscript><img src="img/tw-gravity.jpg" width="540" height="960" alt=""></noscript>
+          </button>
+          <p class="reel-t">What if the world lost gravity?</p>
+        </li>
+        <li class="reel">
+          <button class="clip clip--reel" type="button" data-slug="earth" aria-label="Play the reel: What if the Earth stopped spinning?">
+            <video muted loop playsinline preload="none" data-poster="img/tw-earth.jpg" width="540" height="960" src="video/tw-earth.mp4"></video><noscript><img src="img/tw-earth.jpg" width="540" height="960" alt=""></noscript>
+          </button>
+          <p class="reel-t">What if the Earth stopped spinning?</p>
+        </li>
+        <li class="reel">
+          <button class="clip clip--reel" type="button" data-slug="typhoon" aria-label="Play the reel: What if a typhoon hit Singapore?">
+            <video muted loop playsinline preload="none" data-poster="img/tw-typhoon.jpg" width="540" height="960" src="video/tw-typhoon.mp4"></video><noscript><img src="img/tw-typhoon.jpg" width="540" height="960" alt=""></noscript>
+          </button>
+          <p class="reel-t">What if a typhoon hit Singapore?</p>
+        </li>
+      </ul>
+      <div class="small-two tw-words" data-small>
+        <div class="small-col">
+          <p class="body-copy">Every reel is a 3D simulation made with code and AI tools, on TikTok, Instagram and YouTube.</p>
+        </div>
+        <ul class="points small-col">
+          <li>Every reel opens on its question in the first second.</li>
+        </ul>
+      </div>
+     </div>
+    </div>
+  </section>
+
+  <!-- ============ The AI pipeline ============ -->
+  <!-- P6: the four steps are the poster, one assembly line top to bottom. The text column is the dived sections'
+       width already, so the 3D owner can switch on a dive here later without a new layout. -->
+  <section class="sec sec--workflow" data-stop="workflow" aria-labelledby="wf-h">
+    <img class="sec-still sec-still--logo" src="img/world-fallback.png" width="1080" height="1080" loading="lazy" decoding="async" alt="">
+    <div class="col" id="workflow">
+     <div class="col-in">
+      <h2 id="wf-h" class="poster-h" tabindex="-1">I built the AI pipeline that makes tinyworld.</h2>
+      <ol class="pipeline" aria-label="The four steps, in order" data-proof>
+        <li><span class="pl-n" aria-hidden="true">1</span><p class="pl-w">Research</p><div class="pl-d"><p class="pl-line">Every number is checked against two sources.</p></div></li>
+        <li><span class="pl-n" aria-hidden="true">2</span><p class="pl-w">Script</p><div class="pl-d"><p class="pl-line">One AI drafts it. A second AI edits it.</p></div></li>
+        <li><span class="pl-n" aria-hidden="true">3</span><p class="pl-w">Build</p><div class="pl-d"><p class="pl-line">AI writes the code that builds and renders each 3D scene.</p></div></li>
+        <li><span class="pl-n" aria-hidden="true">4</span><p class="pl-w">Check</p><div class="pl-d"><p class="pl-line">A different AI reviews every reel before it is posted.</p></div></li>
+      </ol>
+      <div class="ai-also" data-small>
+        <!-- the owner may cut the next line: it is one element -->
+      </div>
+     </div>
+    </div>
+  </section>
+
+  <!-- ============ Before We Grow Up ============ -->
+  <section class="sec sec--bwgu" data-stop="bwgu" aria-labelledby="bw-h">
+    <img class="sec-still sec-still--logo" src="img/world-fallback.png" width="1080" height="1080" loading="lazy" decoding="async" alt="">
+    <div class="col" id="bwgu">
+     <div class="col-in">
+      <h2 id="bw-h" class="poster-h" tabindex="-1">Before We Grow Up, a student video series.</h2>
+      <figure class="bwgu-pic" data-proof>
+        <img src="img/bwgu/ig-grid.jpg" width="1600" height="709" loading="lazy" decoding="async"
+             alt="Three posts from the Before We Grow Up Instagram grid: two students talking at a table on campus, a title card asking What are you doing all this for?, and a student speaking into a microphone">
+        <!-- phone only (site.css): the same three posts as a swipe row, one tile per post, cut from the same picture -->
+        <div class="bwgu-tiles" role="img" aria-label="Three posts from the Before We Grow Up Instagram grid: two students talking at a table on campus, a title card asking What are you doing all this for?, and a student speaking into a microphone">
+          <span class="bwgu-tile"><img src="img/bwgu/ig-grid.jpg" width="1600" height="709" loading="lazy" decoding="async" alt=""></span>
+          <span class="bwgu-tile"><img src="img/bwgu/ig-grid.jpg" width="1600" height="709" loading="lazy" decoding="async" alt=""></span>
+          <span class="bwgu-tile"><img src="img/bwgu/ig-grid.jpg" width="1600" height="709" loading="lazy" decoding="async" alt=""></span>
+        </div>
+        <figcaption class="bwgu-cap">
+          <span class="link-line--pair">
+            <a class="text-link" href="https://www.instagram.com/beforewegrowup_/" target="_blank" rel="noopener">Instagram</a>
+            <a class="text-link" href="https://www.tiktok.com/@beforewegrowup_" target="_blank" rel="noopener">TikTok</a>
+          </span>
+        </figcaption>
+      </figure>
+      <div class="small-two" data-small>
+        <p class="body-copy small-col">Real stories from Singaporean youths, made by UNCOOKED, a team of six SP students.</p>
+        <p class="body-copy small-col">I was the team&rsquo;s Documentation Director: I filmed and edited the behind-the-scenes video.</p>
+      </div>
+     </div>
+    </div>
+  </section>
+
+  <!-- ============ About ============ -->
+  <section class="sec sec--about" data-stop="about" aria-labelledby="about-h">
+    <img class="sec-still sec-still--logo" src="img/world-fallback.png" width="1080" height="1080" loading="lazy" decoding="async" alt="">
+    <div class="col" id="about">
+     <div class="col-in">
+      <h2 id="about-h" class="poster-h" tabindex="-1">I&rsquo;m Tedd, 18, Year&nbsp;2 at Singapore Polytechnic.</h2>
+      <div class="about-poster">
+       <div class="about-pic" data-proof>
+      <img class="about-photo" src="img/tedd.jpg" width="720" height="950" loading="lazy" decoding="async"
+           alt="Tedd Lai, smiling, with short black hair and a white knit sweater, against a grey studio wall">
+       </div>
+       <div class="about-words" data-small>
+      <p class="body-copy">Outside school I have worked event crew at an F1 race, at Gardens by the Bay and during the Kusu Island pilgrimage season. Long days, live crowds.</p>
+      <p class="body-copy">I ran a half marathon this year and I&rsquo;m training for my first full marathon this December.</p>
+      <ul class="tool-row" aria-label="Skills">
+        <li>Meta Ads Manager</li>
+        <li>CapCut</li>
+        <li>Photoshop</li>
+        <li>Illustrator</li>
+        <li>Figma</li>
+      </ul>
+       </div>
+      </div>
+     </div>
+    </div>
+  </section>
+
+  <!-- ============ Contact ============ -->
+  <section class="sec sec--contact" data-stop="contact" aria-labelledby="contact-h">
+    <img class="sec-still sec-still--logo" src="img/world-fallback.png" width="1080" height="1080" loading="lazy" decoding="async" alt="">
+    <div class="col" id="contact">
+     <div class="col-in">
+      <h2 id="contact-h" class="contact-h" tabindex="-1" >Let&rsquo;s talk.</h2>
+      <!-- slot for the lead: the availability line (fill the text, remove hidden) -->
+      <p class="avail" hidden></p>
+      <p class="lead-line">I&rsquo;m looking for a digital marketing internship.</p>
+      <div class="contact-actions">
+        <button class="button button--email" type="button" id="copy-email" data-email="teddlaidiwei1@gmail.com" aria-describedby="copy-hint">
+          <span class="email-label">teddlaidiwei1@gmail.com</span>
+          <span class="email-done" aria-hidden="true">Copied</span>
+        </button>
+        <p class="contact-hint" id="copy-hint">Press to copy the address.</p>
+        <input class="copy-fallback" id="copy-fallback" type="text" value="teddlaidiwei1@gmail.com" readonly tabindex="-1" aria-hidden="true">
+        <p class="sr-only" id="copy-status" aria-live="polite"></p>
+      </div>
+      <p class="contact-links">
+        <a class="text-link" href="mailto:teddlaidiwei1@gmail.com">Open in your mail app</a>
+        <a class="text-link" href="https://www.linkedin.com/in/teddlai" target="_blank" rel="noopener">LinkedIn</a>
+        <!-- slot for the lead: the CV (add href and download, fill the text, remove hidden) -->
+        <a class="text-link cv-link" hidden></a>
+      </p>
+     </div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot" id="foot">
+  <svg class="foot-name" viewBox="0 10 1040 152" role="img" aria-label="Tedd Lai">
+    <text x="0" y="160">TEDD LAI</text>
+  </svg>
+  <p class="foot-line">Built in Singapore, 2026.</p>
+</footer>
+</div>
+
+<!-- ============ The full ad with sound ============ -->
+<dialog class="player" id="player" aria-label="Video ad with sound">
+  <div class="player-in">
+    <button class="button player-close" type="button" id="player-close">Close</button>
+    <video class="player-video" id="player-video" controls playsinline preload="none"></video>
+  </div>
+</dialog>
+
+<!-- ============ Quick view ============ -->
+<dialog class="qv" id="quick-view" aria-modal="true" aria-labelledby="qv-name">
+  <div class="qv-inner">
+    <div class="qv-top">
+      <div class="qv-id">
+        <img class="qv-photo" src="img/tedd.jpg" width="720" height="950" loading="lazy" decoding="async"
+             alt="Tedd Lai, smiling, with short black hair and a white knit sweater">
+        <h2 class="qv-name" id="qv-name">Tedd Lai</h2>
+      </div>
+      <button class="button qv-close" type="button" id="qv-close">Close</button>
+    </div>
+    <p class="qv-line">Year 2, Digital Media &amp; Communications, Singapore Polytechnic. I run Meta ads, make the video ads and run my own channel. Looking for a digital marketing internship.</p>
+
+    <p class="qv-contact">
+      <a class="text-link" href="mailto:teddlaidiwei1@gmail.com">teddlaidiwei1@gmail.com</a>
+      <a class="text-link" href="https://www.linkedin.com/in/teddlai" target="_blank" rel="noopener">LinkedIn</a>
+    </p>
+
+    <dl class="qv-facts">
+      <div><dt id="qv-views">800,000+</dt><dd>views on tinyworld, my own channel, in its first month</dd></div>
+      <div><dt>30+</dt><dd>Meta ad campaigns</dd></div>
+      <div><dt>6 years</dt><dd>running paid campaigns</dd></div>
+    </dl>
+
+    <ul class="qv-projects">
+      <li><a href="#ads" data-qv-go><span class="qv-p">Meta ads</span><span class="qv-d">Meta ads I planned, made and tested: 30+ campaigns for a real estate business, 2020 to 2026, and the video ads.</span></a></li>
+      <li><a href="#tinyworld" data-qv-go><span class="qv-p">tinyworld</span><span class="qv-d">My &ldquo;What if...?&rdquo; 3D simulation reels on TikTok, Instagram and YouTube.</span></a></li>
+      <li><a href="#workflow" data-qv-go><span class="qv-p">AI pipeline</span><span class="qv-d">I built the AI pipeline that makes tinyworld.</span></a></li>
+      <li><a href="#bwgu" data-qv-go><span class="qv-p">Before We Grow Up</span><span class="qv-d">A student series by UNCOOKED. I was Documentation Director.</span></a></li>
+    </ul>
+  </div>
+</dialog>
+</body>
+</html>

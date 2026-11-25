@@ -205,6 +205,7 @@
   function colW(stop) { return (L.cols && L.cols[stop] ? L.cols[stop].w : L.colComp); }
 
   function layout() {
+    hudSz = null; headSz = null;   // iPad pass: sizes re-read after a layout
     var Wd = window.innerWidth, H = window.innerHeight, keepY = window.scrollY;
     var mode = Wd < 600 ? 'phone' : (Wd / H >= 1.3 && Wd >= 900 ? 'wide' : 'tall');
     root.setAttribute('data-layout', mode);
@@ -885,7 +886,8 @@
       var t = T[i]; if (!t) continue;
       var A = secs[i - 1], B = secs[i];
       if (y < t.t0) break;
-      if (y >= t.t1 && !(t.hero && y < t.g3)) {
+      // (iPad pass: tall, a hand-off also stays open until g3, while the planet settles from its calm-screen size)
+      if (y >= t.t1 && !((t.hero || (!wide && !red && t.c0 !== undefined)) && y < t.g3)) {
         cur = i; from = A.stop; to = B.stop; roll = 1; dive = B.dives ? 1 : 0; fieldP[i] = 1; zone = zoneOf(B); phase = 'arrived';
         if (i === 1) heroK = 0;
         continue;
@@ -925,10 +927,13 @@
           // the calm screen: the planet keeps its own stage beside A's words (pulling back out of A's place) until
           // they have gone, then grows and swings to B's side on the empty screen, stands big beside the empty half
           // of the window, and settles into B's stage as B's words come in (it is kept above them)
-          var gw = Math.min(gh * 1.25, L.W * 0.52), cxR = L.W - L.gr - gw / 2, cxL = L.gl + gw / 2;
+          // iPad pass (fix 6, depth): bigger on the calm screen. The HUD row is empty there (both readouts step out
+          // while the planet rides; the km figure has its own room), so the stage starts right under the header
+          var topC = L.headB + L.hudGap, ghC = Math.max(60, bot - topC);
+          var gw = Math.min(ghC * 1.3, L.W * 0.56), cxR = L.W - L.gr - gw / 2, cxL = L.gl + gw / 2;
           var xp = smooth(ramp(y, t.c0, t.c0 + H * 0.3));
           var cx = mix(sideOf(zA0) === 'R' ? cxR : cxL, sB === 'R' ? cxR : cxL, xp);
-          big = { x: cx - gw / 2, y: top, w: gw, h: gh };
+          big = { x: cx - gw / 2, y: topC, w: gw, h: ghC };
           var k1 = smooth(ramp(y, t.c0, t.c0 + H * 0.22)), k2 = smooth(ramp(y, t.c1, t.g3));
           zone = k2 > 0 ? lerpRect(big, zB0, k2) : lerpRect(zA0, big, k1);
           if (red) zone = y < t.c0 ? zA0 : zB0;
@@ -980,7 +985,21 @@
         zone = red ? zoneOf(B) : lerpRect(zoneOf(A), zoneOf(B), smooth(rpb));
         from = A.stop; to = B.stop; roll = rpb; dive = rpb >= 1 && B.dives ? dp : 0;
         fieldP[i] = rpb; cur = rpb >= 0.5 ? i : i - 1;
-        phase = rpb < 1 ? 'roll' : 'dive';
+        phase = rpb < 1 ? 'roll' : (y >= t.t1 ? 'arrived' : 'dive');
+        // iPad pass (fix 6), tall: on the calm screen the planet leaves the band and grows into the empty window
+        // (the km figure above it, as on the start line), then settles back into the band as B's words come in.
+        // Nothing else is on screen then: A's words have gone under the band, B's are still below the window.
+        var kq = red || t.c0 === undefined ? 0 : smooth(ramp(y, t.c0, t.c0 + H * 0.4)) * (1 - smooth(ramp(y, t.c1, t.g3)));
+        if (kq > 0.001) {
+          var wq = handWords(i, y, L.clipTop), hbq = L.hudH + L.hudGap;
+          var topQ = L.headB + 4, botQ = Math.min(wq.gB - pad, H - L.gb), ghQ = Math.max(60, botQ - topQ), kmQ = Math.round(ghQ * 0.3);
+          var bigQ = { x: L.gl, y: topQ + kmQ, w: L.W - L.gl - L.gr, h: Math.max(80, ghQ - kmQ) };
+          var baseQ = { x: zone.x, y: zone.y + hbq, w: zone.w, h: Math.max(80, zone.h - hbq) };
+          zone = keepClear(lerpRect(baseQ, bigQ, kq), wq, pad);
+          direct = true; line = L.clipTop; words = wq;
+          S_riding = kq > 0.02;
+          kroom = { x: L.gl, y: topQ, w: L.W - L.gl - L.gr, h: Math.max(0, zone.y - pad - topQ) };
+        }
       }
       break;
     }
@@ -1109,22 +1128,41 @@
     S.topField = top;
     paintWipe();
   }
-  // the circle: a flat round div grown with transform: scale only (no clip-path, no repaint while it grows)
-  var wipeEl = null, WIPE_R0 = 100;
+  // the circle (iPad pass): one filled circle on a window-sized 2D canvas, redrawn only when it changes. The old
+  // way (a round div the size of the window's diagonal, grown with transform: scale) made Safari re-rasterise a
+  // layer of up to 8 million pixels on every frame of the wipe.
+  var wipeEl = null, wipeCx = null, wipeDpr = 1, wipeH = 1;
   function sizeWipe() {
-    if (!wipeEl) { var box = $('.fields'); if (!box) return; wipeEl = document.createElement('div'); wipeEl.className = 'wipe'; box.appendChild(wipeEl); }
-    WIPE_R0 = Math.ceil(Math.sqrt(L.W * L.W + L.H * L.H) / 2);
-    wipeEl.style.width = wipeEl.style.height = (2 * WIPE_R0) + 'px';
+    if (!wipeEl) {
+      var box = $('.fields'); if (!box) return;
+      wipeEl = document.createElement('canvas'); wipeEl.className = 'wipe'; wipeEl.setAttribute('aria-hidden', 'true');
+      box.appendChild(wipeEl);
+      wipeCx = wipeEl.getContext('2d', { alpha: true });
+    }
+    wipeDpr = Math.min(window.devicePixelRatio || 1, 2);
+    // (touch: 160 px more, so the strip under a browser bar that slides away is covered too)
+    wipeH = L.H + (matchMedia('(pointer: coarse)').matches ? 160 : 0);
+    var cw = Math.round(L.W * wipeDpr), ch = Math.round(wipeH * wipeDpr);
+    if (wipeEl.width !== cw) wipeEl.width = cw;
+    if (wipeEl.height !== ch) wipeEl.height = ch;
+    wipeEl.style.width = L.W + 'px'; wipeEl.style.height = wipeH + 'px';
     wipeEl._k = '';
   }
   function paintWipe() {
-    if (!wipeEl) return;
+    if (!wipeEl || !wipeCx) return;
     var w = S.wipe;
     if (!w || !w.on || w.r < 1) { if (wipeEl._v !== 0) { wipeEl._v = 0; wipeEl.style.visibility = 'hidden'; } return; }
     var c = fieldColour(secs[w.i].stop);
-    if (wipeEl._c !== c) { wipeEl._c = c; wipeEl.style.backgroundColor = c; }
-    var k = 'translate(' + (w.cx - WIPE_R0).toFixed(1) + 'px,' + (w.cy - WIPE_R0).toFixed(1) + 'px) scale(' + (w.r / WIPE_R0).toFixed(4) + ')';
-    if (wipeEl._k !== k) { wipeEl._k = k; wipeEl.style.transform = k; }
+    var k = w.cx.toFixed(1) + ',' + w.cy.toFixed(1) + ',' + w.r.toFixed(1) + ',' + c;
+    if (wipeEl._k !== k) {
+      wipeEl._k = k;
+      var g = wipeCx;
+      g.setTransform(wipeDpr, 0, 0, wipeDpr, 0, 0);
+      g.clearRect(0, 0, L.W, wipeH);
+      g.fillStyle = c;
+      if (w.R && w.r >= w.R - 1) g.fillRect(0, 0, L.W, wipeH);
+      else { g.beginPath(); g.arc(w.cx, w.cy, w.r, 0, Math.PI * 2); g.fill(); }
+    }
     if (wipeEl._v !== 1) { wipeEl._v = 1; wipeEl.style.visibility = 'visible'; }
   }
   // which field is under a point of the window (for the header, the HUD and the km figure)
@@ -1190,7 +1228,9 @@
       var zTop = z.y;
       if (wide && worldLive()) { var wb = call('bounds'); if (wb && wb.h > 0 && wb.y < zTop) zTop = wb.y; }
       // (the readouts' real heights: a caption can wrap to a second line while the stage is narrower)
-      var wl = hudL.offsetWidth, hl = hudL.offsetHeight, wr = hudR.offsetWidth, hr = hudR.offsetHeight;
+      // iPad pass: the readouts' sizes are measured once after their text or width changes (hudSize), not on
+      // every scroll frame
+      var hz = hudSize(), wl = hz.wl, hl = hz.hl, wr = hz.wr, hr = hz.hr;
       var hy = wide ? Math.max(L.hudY, Math.round(zTop - Math.max(L.hudH, hl, hr) - L.hudGap)) : z.y;
       var lx = Math.round(z.x), rx = Math.round(z.x + z.w), ly = Math.round(hy), ry = ly;
       var inHero = S.cur === 0;
@@ -1207,7 +1247,7 @@
       // header covers right now (it is back on the way up) steps out of sight until the header goes again; wide, a
       // readout that a field edge is running through steps out too, so it is never half on one colour.
       // the header's own place (not its sliding box), whenever it is shown
-      var hb = (head && !head.classList.contains('is-hidden')) ? { top: 0, bottom: head.offsetHeight, left: head.offsetLeft, right: head.offsetLeft + head.offsetWidth } : null;
+      var hb = (head && !head.classList.contains('is-hidden')) ? headBox() : null;
       var boxL = { x: lx, y: ly, w: wl, h: hl }, boxR = { x: rx - wr, y: ry, w: wr, h: hr };
       var underHead = function (b) { return hb && b.y < hb.bottom && b.y + b.h > hb.top && b.x < hb.right + 6 && b.x + b.w > hb.left - 6; };
       if (underHead(boxL)) offL = true;
@@ -1316,8 +1356,13 @@
   function fadeBig(y) {
     if (!big.length) return;
     var line = L.clipNow || 0, F = 6;
+    // iPad pass: once per frame (paintChrome and the loop both call it), and a live box is only read when it is
+    // near the band's edge (a read after the frame's style writes is a forced layout)
+    if (fadeBig._f === frameN && fadeBig._y === y) return;
+    fadeBig._f = frameN; fadeBig._y = y;
     for (var i = 0; i < big.length; i++) {
-      var b = big[i], t = b.live ? b.el.getBoundingClientRect().top : b.top - y;
+      var b = big[i], t = b.top - y;
+      if (b.live && Math.abs(t - line) < L.H * 0.35) t = b.el.getBoundingClientRect().top;
       var cut = t < line + F;
       if (cut === !!b.set) continue;
       if (cut && window.gsap) { window.gsap.killTweensOf(b.el); b.el.style.transform = ''; b.el.style.opacity = ''; }
@@ -1485,9 +1530,26 @@
   function hudFit() {
     if (!hudL || !hudR || !S.zone) return;
     var rw = Math.round(Math.max(S.zone.w * 0.5, L.mode === 'wide' ? 190 : 150)) + 'px';   // r13 pass B: room for "of 42.195 km" over the badge
-    if (hudR._mw !== rw) { hudR._mw = rw; hudR.style.maxWidth = rw; }
-    var mw =Math.max(L.mode === 'wide' ? 160 : 120, Math.round(S.zone.w - hudR.offsetWidth - (L.mode === 'wide' ? 24 : 16))) + 'px';
-    if (hudL._mw !== mw) { hudL._mw = mw; hudL.style.maxWidth = mw; }
+    if (hudR._mw !== rw) { hudR._mw = rw; hudR.style.maxWidth = rw; hudSz = null; }
+    var mw =Math.max(L.mode === 'wide' ? 160 : 120, Math.round(S.zone.w - hudSize().wr - (L.mode === 'wide' ? 24 : 16))) + 'px';
+    if (hudL._mw !== mw) { hudL._mw = mw; hudL.style.maxWidth = mw; hudSz = null; }
+  }
+  // iPad pass: cached sizes of the two readouts and the header (a read after the frame's style writes forces a
+  // layout of the whole 19,000 px page, so it happens only after something that changes them)
+  var hudSz = null, headSz = null;
+  function hudSize() {
+    if (!hudSz) hudSz = { wl: hudL ? hudL.offsetWidth : 0, hl: hudL ? hudL.offsetHeight : 0, wr: hudR ? hudR.offsetWidth : 0, hr: hudR ? hudR.offsetHeight : 0 };
+    return hudSz;
+  }
+  function headBox() {
+    var k = head.className;
+    if (!headSz || headSz.k !== k) headSz = { k: k, top: 0, bottom: head.offsetHeight, left: head.offsetLeft, right: head.offsetLeft + head.offsetWidth };
+    return headSz;
+  }
+  // anything that may change a readout's size (its text, a class) marks the cache stale
+  if (window.MutationObserver) {
+    var hudMo = new MutationObserver(function () { hudSz = null; });
+    [hudL, hudR].forEach(function (el) { if (el) hudMo.observe(el, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['class'] }); });
   }
   // a caption that wraps to another line changes the HUD's height: the stage starts under it
   function hudResized() {
@@ -1528,8 +1590,9 @@
   }
 
   // ---------- the one loop ----------
-  var lastY = -1, lastW = 0, lastH = 0, movedAt = 0, relayoutAt = 0;
+  var lastY = -1, lastW = 0, lastH = 0, movedAt = 0, relayoutAt = 0, frameN = 0;
   function frame(now) {
+    frameN++;
     var y = window.scrollY;
     if (window.innerWidth !== lastW || window.innerHeight !== lastH) onResize();
     if (dirty || y !== lastY) {
@@ -2016,12 +2079,15 @@
   function readArea() { return L.mode === 'wide' ? L.H * 0.78 : (L.clipTop || 0) + (L.H - (L.clipTop || 0)) * 0.78; }
   function revealCheck() {
     if (!acts.length) return;
-    var H = window.innerHeight, line = readArea();
+    var H = L.H || window.innerHeight, line = readArea(), y = window.scrollY;
     for (var i = 0; i < acts.length; i++) {
       var a = acts[i]; if (a.done) continue;
-      var r = a.sec.el.getBoundingClientRect();
+      // iPad pass: page positions measured once per layout (docRect, cached), not getBoundingClientRect every
+      // scroll frame (each read after the frame's style writes forced a layout of the whole page)
+      if (a._mk !== measureN) { a._mk = measureN; a._r = docRect(a.sec.el); a._h = a.p.h ? docRect(a.p.h) : a._r; }
+      var r = { top: a._r.top - y, bottom: a._r.bottom - y };
       if (r.bottom < 0 || r.top > H) continue;          // none of it in view yet
-      var hr = a.p.h ? a.p.h.getBoundingClientRect() : r;
+      var hr = { top: a._h.top - y, bottom: a._h.bottom - y };
       if (hr.bottom < (L.mode === 'wide' ? 0 : (L.clipTop || 0)) + 8) finishIn(a); // its headline is already past: show it as it is
       else if (hr.top < line) playIn(a);
       // P6: a visitor who stops with a headline low in the window (under the reading area) sees it arrive too,

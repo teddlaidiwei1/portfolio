@@ -551,6 +551,7 @@ W removes your group and disposes its geometries after `dispose()`; materials fr
     WORLD.ok = false;
     if (renderer) { try { renderer.dispose(); } catch (e) { /* already gone */ } }
     if (canvas && canvas.parentNode) canvas.parentNode.removeChild(canvas);
+    if (floorEl && floorEl.parentNode) floorEl.parentNode.removeChild(floorEl);
     root.classList.remove('world-live');
     if (window.console) console.info('tinyworld planet off, showing the still pictures:', why);
     emit('world:failed', { reason: String(why) });
@@ -563,7 +564,13 @@ W removes your group and disposes its geometries after `dispose()`; materials fr
   var phoneQ = matchMedia('(max-width: 768px)');
   var fineQ = matchMedia('(hover: hover) and (pointer: fine)');
   var forced = /[?&]world=(low|high)/.exec(location.search);
-  var startLow = forced ? forced[1] === 'low' : (phoneQ.matches || !fineQ.matches && matchMedia('(pointer: coarse)').matches || (navigator.hardwareConcurrency || 8) <= 4);
+  // iPad pass (fix 4): a tablet (a touch screen wider than a phone) starts on the high tier: shadows on and a sharper
+  // picture. The quality watcher in the frame loop steps it down if its frames stay slow (and back up when smooth).
+  // Phones and machines with 4 cores or fewer still start low. (Safari reports at most 8 cores, often fewer, so the
+  // core count is not used to judge a tablet.)
+  var coarseQ = matchMedia('(pointer: coarse)');
+  var tabletQ = !phoneQ.matches && coarseQ.matches && !fineQ.matches;
+  var startLow = forced ? forced[1] === 'low' : (phoneQ.matches || (!tabletQ && (navigator.hardwareConcurrency || 8) <= 4));
   WORLD.quality = startLow ? 'low' : 'high';
 
   try {
@@ -582,6 +589,12 @@ W removes your group and disposes its geometries after `dispose()`; materials fr
   renderer.toneMapping = T.NeutralToneMapping;
   renderer.shadowMap.enabled = WORLD.quality === 'high';
   renderer.shadowMap.type = T.PCFShadowMap;
+  // iPad pass (fix 5): the soft contact shadow on the field, under the canvas (positioned, so DOM order sets the
+  // stacking: the shadow first, the planet over it)
+  var floorEl = document.createElement('div'), floorKey = '', floorVis = false;
+  floorEl.className = 'world-floor'; floorEl.setAttribute('aria-hidden', 'true');
+  layer.appendChild(floorEl);
+  canvas.style.position = 'relative';
   layer.appendChild(canvas);
 
   // ---------- camera: straight on when zoomed out, dives to a horizon when arrived ----------
@@ -596,6 +609,9 @@ W removes your group and disposes its geometries after `dispose()`; materials fr
   // ---------- lights (logo values) ----------
   // depth: a low fill and a key light about 55 degrees to the side of the camera, so every form has a lit side
   // and a clearly darker side (the old light sat behind the camera and flattened everything)
+  // (iPad pass: the levels live in LIGHT, so a test can try other values with WORLD._light)
+  var LIGHT = { fill0: 1.15, fill1: 0.68, key0: 2.95, key1: 3.35 };
+  WORLD._light = function (o) { if (o) Object.keys(o).forEach(function (k) { if (k in LIGHT) LIGHT[k] = +o[k]; }); dirty = true; return LIGHT; };
   var hemi = new T.HemisphereLight('#fff6e0', '#c98a2a', 0.75);
   sc.add(hemi);
   var sun = new T.DirectionalLight('#ffffff', 3.1);
@@ -1858,11 +1874,13 @@ W removes your group and disposes its geometries after `dispose()`; materials fr
 
   // fix r4: on a phone the stage is small, so sharpness is cheap: the low tier there renders at the device's pixel
   // ratio up to 2 (it keeps its lighter geometry and has no depth map). Low on a wider screen stays at 1.
+  // iPad pass: prCap is the quality watcher's sharpness (1.5, 1.25 or 1 on a 2x screen); see watchQuality()
+  var prCap = 1.5;
   function pixelRatio() {
     var d = window.devicePixelRatio || 1;
     // r13 pass A: capped at 1.5 (was 2): about half the pixels on a 2x screen, still sharp at the planet's size
     if (WORLD.quality === 'low') return phoneQ.matches ? Math.min(d, 1.5) : 1;
-    return Math.min(d, 1.5);
+    return Math.min(d, prCap);
   }
   var sizeW = 0, sizeH = 0, viewH = 1;
   function resize() {
@@ -2787,7 +2805,52 @@ W removes your group and disposes its geometries after `dispose()`; materials fr
 
   // ---------- per-frame ----------
   var lastT = 0, running = false, time = 0, lastScrollY = window.scrollY, scrollV = 0, lastRender = 0, settleUntil = 0;
-  var fpsFrames = 0, fpsTime = 0, fpsChecked = !!forced || WORLD.quality === 'low';
+  var fpsChecked = !!forced;
+  // ---------- iPad pass (fix 3): the quality watcher ----------
+  // It runs for the whole visit, only on frames drawn back to back (the 30 fps idle draws and pauses are not
+  // counted). Four steps, from the best down: high tier at sharpness 1.5, 1.25, 1, then the low tier (no shadows).
+  // About 40 slow frames in a row (under about 38 fps on average) take it one step down; 4 s of smooth frames
+  // (over about 55 fps) take it one step back up, never above where it started and never back to a step it was
+  // pushed out of twice. Turning shadows back on rebuilds every material, so that only happens while the page is
+  // still. A steady 30 fps (iPad Low Power Mode caps the screen there) only lowers sharpness, never the shadows.
+  var Q_STEPS = [{ q: 'high', pr: 1.5 }, { q: 'high', pr: 1.25 }, { q: 'high', pr: 1 }, { q: 'low', pr: 1 }];
+  var qStep = WORLD.quality === 'low' ? 3 : 0, qTop = qStep, qDrops = [0, 0, 0, 0], qWin = [], qGood = 0, qQuietAt = 0;
+  function qApply(n) {
+    var s = Q_STEPS[n];
+    qStep = n; prCap = s.pr; qWin = []; qGood = 0; qQuietAt = performance.now() + 1500;
+    if (s.q !== WORLD.quality) setQuality(s.q);
+    else { renderer.setPixelRatio(pixelRatio()); renderer.setSize(vw, vh, false); dirty = true; }
+    WORLD._q = { step: qStep, pr: prCap, quality: WORLD.quality };
+  }
+  function watchQuality(now, gap, busy) {
+    if (!busy || gap > 120 || gap <= 0 || now < qQuietAt) return;   // only back-to-back frames, settled after a change
+    qWin.push(gap);
+    if (qWin.length > 40) qWin.shift();
+    var d = window.devicePixelRatio || 1;
+    if (qWin.length === 40) {
+      var sum = 0, sq = 0;
+      for (var i = 0; i < 40; i++) { sum += qWin[i]; sq += qWin[i] * qWin[i]; }
+      var avg = sum / 40, sd = Math.sqrt(Math.max(0, sq / 40 - avg * avg));
+      var capped = avg > 30 && avg < 37 && sd < 3;
+      if (avg > 26 && qStep < 3) {
+        var next = qStep + 1;
+        if (d <= 1.05 && next < 3) next = 3;            // a 1x screen: sharpness steps change nothing
+        if (next === 3 && capped) return;                // a 30 fps cap: shadows stay
+        qDrops[qStep]++;
+        qApply(next);
+        return;
+      }
+    }
+    if (gap < 18.2) qGood++; else qGood = Math.max(0, qGood - 3);
+    if (qGood > 240 && qStep > qTop) {
+      var up = qStep - 1;
+      if (up === 2 && d <= 1.05) up = 0;
+      if (qDrops[up] >= 2) { qGood = 0; return; }      // pushed out of that step twice: stay
+      if (Q_STEPS[up].q !== WORLD.quality && (Math.abs(scrollV) > 30 || diveS.x > 0.02 && diveS.x < 0.98)) return;   // shadows back on only while still
+      qApply(up);
+    }
+  }
+  WORLD._q = { step: qStep, pr: prCap, quality: WORLD.quality };
   var qA = new T.Quaternion(), qB = new T.Quaternion(), qC = new T.Quaternion(), qF = new T.Quaternion(), qD = new T.Quaternion();
   var vA = new T.Vector3(), vB = new T.Vector3(), eul = new T.Euler(0, 0, 0, 'YXZ');
   var WIND_W = new T.Vector3(-1, 0, 0), Z_AXIS = new T.Vector3(0, 0, 1);
@@ -3030,11 +3093,13 @@ W removes your group and disposes its geometries after `dispose()`; materials fr
     // r13 pass B: when nothing changed the world keeps living (YOU's idle loop, the clouds, a place's own life) at
     // about 30 frames a second, and only while its stage is in the window (the tab hidden or a dialog open stops the
     // loop altogether, above). Scrolling and moves draw every frame.
-    if (now > settleUntil) {
+    var busyNow = now <= settleUntil;
+    if (!busyNow) {
       var sg = stageGoal, onScreen = !!sg && sg.w > 8 && sg.h > 8 && sg.x < vw && sg.x + sg.w > 0 && sg.y < viewH && sg.y + sg.h > 0;
       if (!onScreen) { lastT = now; return; }
       if (now - lastRender < 31) return;
     }
+    var gapMs = now - lastRender;
     lastRender = now;
     WORLD._drawnAt = now;
     var t0 = performance.now();
@@ -3043,11 +3108,8 @@ W removes your group and disposes its geometries after `dispose()`; materials fr
     lastT = now;
     dirty = false;
 
-    // FPS probe: 60 frames after the intro under 40 fps -> low tier
-    if (!fpsChecked && intro.started && !calm) {
-      if (intro.t > 0.25 || intro.done) { fpsFrames++; fpsTime += dt; }
-      if (fpsFrames >= 60) { fpsChecked = true; if (fpsTime / fpsFrames > 1 / 40) setQuality('low'); }
-    }
+    // iPad pass (fix 3): the quality watcher (it replaces the one-off probe during the intro)
+    if (!fpsChecked && intro.started && (intro.t > 0.25 || intro.done)) watchQuality(now, gapMs, busyNow);
 
     // the world clock: holding the planet freezes it
     timeK.goal = frozen ? 0 : 1;
@@ -3097,6 +3159,7 @@ W removes your group and disposes its geometries after `dispose()`; materials fr
     bobK += ((curStop === 'hero' ? 1 : 0) - bobK) * Math.min(1, (dt || 0) * 3);
     // r13 pass B (Tedd: bring the 3D back to life): the gentle float on the first screen is back
     var bob = still ? 0 : Math.sin(time * 1.4) * 2.5 * bobK * (1 - smooth(0, 0.3, diveE));   // calm pass: no bob once the dive is under way (a half-dived view holds still)
+    floorBob = bob;
     // fix r4: a companion landmark reaches about 3.25 planet units left of the centre; on a narrow companion stage
     // (1440x900, 1280x720) that is past the stage edge, so while one is up the planet slides right (away from the text,
     // never past its own room on the right) instead of shrinking. Eased with the landmark's own rise.
@@ -3365,7 +3428,9 @@ W removes your group and disposes its geometries after `dispose()`; materials fr
     sun.target.position.copy(vB);
     keyLight(dt, still);
     // the whole globe keeps a brighter fill (the logo look); street level gets the low fill and the stronger key
-    hemi.intensity = lerp(1.35, 0.75, diveE); sun.intensity = lerp(2.5, 3.1, diveE);
+    // iPad pass (fix 7, depth): less fill and a stronger key, so each form has a clearly lit and a clearly darker side
+    // (was hemi 1.35 to 0.75, key 2.5 to 3.1)
+    hemi.intensity = lerp(LIGHT.fill0, LIGHT.fill1, diveE); sun.intensity = lerp(LIGHT.key0, LIGHT.key1, diveE);
     sun.position.copy(vB).addScaledVector(sunDir, 10 * s);
     var ext = lerp((R + GUY_H + 0.6) * s, 1.45 * s, diveE);
     var sc2 = sun.shadow.camera;
@@ -3385,10 +3450,38 @@ W removes your group and disposes its geometries after `dispose()`; materials fr
     renderer.setScissorTest(true);
     renderer.render(sc, cam);
     warmScenes(dr, yb);
+    placeFloor(st);
     WORLD._stats.frames++;
     WORLD._stats.last = performance.now() - t0;
     WORLD._stats.tris = renderer.info.render.triangles; WORLD._stats.calls = renderer.info.render.calls; WORLD._stats.geos = renderer.info.memory.geometries; WORLD._stats.texs = renderer.info.memory.textures;
     WORLD._stats.time = time;
+  }
+
+  // iPad pass (fix 5): the planet's contact shadow. A flat soft ellipse on the field just under the disc, at the
+  // planet's lowest point of its float, so it reads as resting a hair above a surface: as the planet floats up the
+  // shadow gets a little smaller and lighter. Zoomed out only (it fades in the first moments of a dive), never past
+  // the stage's lower edge (anything that would be is hidden under the planet itself), and off on the dark fields.
+  var floorBob = 0, floorCol = new T.Color();
+  function placeFloor(st) {
+    var d = discRaw(), lum = relLum(floorCol.set(FIELD_COL[curStop] || '#BFE7F1'));
+    // (off on the first screen: there the planet stands on the name, and a shadow behind the letters read as a smudge)
+    var a = (1 - smooth(0, 0.12, diveE)) * (lum < 0.05 ? 0 : 1) * (1 - clamp(bobK, 0, 1));
+    if (!d || !st || a < 0.01 || !holder.visible || d.r < 8) {
+      if (floorVis) { floorVis = false; floorEl.style.visibility = 'hidden'; }
+      return;
+    }
+    var lift = clamp((2.5 - floorBob) / 5, 0, 1);
+    var w = d.w * 0.78 * (1 - 0.07 * lift), h = Math.max(5, d.w * 0.075);
+    var floorY = d.cy + d.r - floorBob + 2.5 + d.r * 0.02;
+    var cy = Math.min(floorY + h * 0.12, st.y + st.h + 2 - h / 2);
+    var op = a * (1 - 0.3 * lift);
+    var key = (d.cx - w / 2).toFixed(1) + ',' + (cy - h / 2).toFixed(1) + ',' + (w / 600).toFixed(4) + ',' + (h / 80).toFixed(4) + ',' + op.toFixed(3);
+    if (key !== floorKey) {
+      floorKey = key;
+      floorEl.style.transform = 'translate(' + (d.cx - w / 2).toFixed(1) + 'px,' + (cy - h / 2).toFixed(1) + 'px) scale(' + (w / 600).toFixed(4) + ',' + (h / 80).toFixed(4) + ')';
+      floorEl.style.opacity = op.toFixed(3);
+    }
+    if (!floorVis) { floorVis = true; floorEl.style.visibility = 'visible'; }
   }
 
   // a place that was just built is drawn once, full size, into a 1 px corner of the canvas (all its buffers and

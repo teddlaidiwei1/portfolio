@@ -159,6 +159,20 @@ button { font: inherit; color: inherit; }
   pointer-events: none;
 }
 .world-layer canvas { display: block; width: 100%; height: 100%; }
+/* iPad pass (fix 5): a soft contact shadow on the field under the planet (world.js places it; transform and
+   opacity only). Drawn once at this size and scaled, never larger than drawn on a normal stage. */
+.world-floor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 600px;
+  height: 80px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(28, 22, 10, 0.22), rgba(28, 22, 10, 0.1) 52%, rgba(28, 22, 10, 0) 100%);
+  transform-origin: 0 0;
+  visibility: hidden;
+  pointer-events: none;
+}
 
 /* the stage as a real, named element: the rectangle the 3D is drawn in (site.js places it and names the place) */
 .stage { display: none; }
@@ -1550,17 +1564,14 @@ html.js[data-layout="wide"] :is(.stat-row--ads, .stat-row--tw) .stat { grid-temp
 .ad-more > li:first-child .clip::after { top: 80%; }
 
 /* ---------- r13 pass D: the calm screen of each hand-off ---------- */
-/* the next section's colour opens as a circle out of the planet: one flat round div, grown with transform: scale only */
+/* the next section's colour opens as a circle out of the planet. iPad pass: drawn on a window-sized canvas (one
+   filled circle per frame) instead of a huge round div scaled each frame, which Safari re-rasterised every frame */
 .wipe {
   position: absolute;
   left: 0;
   top: 0;
-  width: 200px;
-  height: 200px;
-  border-radius: 50%;
+  display: block;
   visibility: hidden;
-  transform-origin: 50% 50%;
-  will-change: transform;
   pointer-events: none;
 }
 /* the run's km figure, huge on the calm screen; drawn big once and scaled down into the run readout (transform only) */

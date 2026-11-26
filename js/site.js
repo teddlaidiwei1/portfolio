@@ -313,7 +313,7 @@
   // coming in there is CLEAR of a window height of scroll with no words on screen at all: the planet rolls and swings
   // to B's side, B's colour opens as a circle out of the planet, and the km figure sits huge beside it. Every gap is
   // made at least that long (B's lead-in grows); nothing else moves.
-  var CLEAR = 0.45;
+  var CLEAR = 0.3;   // grade round 2 (26 Nov): was 0.45; both Gemini grades called the empty hand-offs dead scroll
   var HERO_SINK = 0.28;  // wide: the name and his face have sunk (heroExit) after this much scroll
   var HERO_SINK_T = 0.11; // tall and phone
   function fitGaps() {
@@ -1384,7 +1384,8 @@
   // The figure is the run readout's own value, drawn once at a big size (crisp) and scaled down to the readout's
   // size and place when it goes back (transform only). Its digits roll like an odometer with the scroll: a digit
   // turns over in the last quarter of its tenth, the next one along with it when it passes 9.
-  var kmBig = null, kmCols = [], KB_FS = 200;
+  var kmBig = null, kmCols = [], KB_FS = 200, kmNext = null, KB_NEXT = 0.34;
+  var NEXT_NAME = { films: 'Meta ads', tinyworld: 'tinyworld', workflow: 'The AI pipeline', bwgu: 'The film', about: 'About me', contact: 'Let’s talk' };
   function buildKm() {
     var hud = $('#hud');
     if (kmBig || !hud) return;
@@ -1400,6 +1401,10 @@
       } else { c.className = 'kb-fix'; c.textContent = k === '.' ? '.' : ' km'; }
       kmBig.appendChild(c);
     });
+    // grade round 1 (26 Nov): the calm screen is a chapter card, not dead air: under the km figure, the next stop's
+    // name wipes in (left to right) as the figure lands in its big place
+    kmNext = document.createElement('span'); kmNext.className = 'kb-next';
+    kmBig.appendChild(kmNext);
     hud.appendChild(kmBig);
   }
   function sizeKm() {
@@ -1435,7 +1440,7 @@
     }
     if (!kmBig._w) kmBig._w = kmBig.offsetWidth;
     if (!kmBig._hfs) { var hv = $('.hud-v', hudR); kmBig._hfs = (hv && parseFloat(getComputedStyle(hv).fontSize)) || 24; }
-    var wB = kmBig._w, hB = KB_FS * 1.05, s0 = kmBig._hfs / KB_FS;
+    var wB = kmBig._w, hB = KB_FS * (1.05 + KB_NEXT), s0 = kmBig._hfs / KB_FS;
     // the big place: centred in the room the planet leaves free, as big as fits (never bigger than drawn)
     var s1 = Math.max(s0, Math.min(1, R.w * 0.92 / wB, R.h * 0.7 / hB));
     var bx = R.x + R.w / 2 + wB * s1 / 2, by = R.y + R.h / 2 - hB * s1 / 2;
@@ -1460,6 +1465,12 @@
     if (kmBig._k !== key) { kmBig._k = key; kmBig.style.transform = 'translate(' + (xr - wB * s).toFixed(1) + 'px,' + yy.toFixed(1) + 'px) scale(' + s.toFixed(4) + ')'; }
     var f = fieldAt(xr - wB * s / 2, yy + hB * s / 2), col = DARK[f] ? '#f3f3f1' : '#141414';
     if (kmBig._c !== col) { kmBig._c = col; kmBig.style.color = col; }
+    if (kmNext) {
+      var nxs = secs[S.hand] ? secs[S.hand].stop : '', nt = NEXT_NAME[nxs] ? 'Next stop → ' + NEXT_NAME[nxs] : '';
+      if (kmNext._t !== nt) { kmNext._t = nt; kmNext.textContent = nt; }
+      var rv = (100 - 100 * smooth((k - 0.7) / 0.3)).toFixed(1);
+      if (kmNext._r !== rv) { kmNext._r = rv; kmNext.style.clipPath = 'inset(0 ' + rv + '% 0 0)'; }
+    }
     if (kmBig._v !== 1) { kmBig._v = 1; kmBig.style.visibility = 'visible'; }
   }
 
@@ -2425,4 +2436,35 @@
     }
   }
   start();
+
+  // grade round 1 (26 Nov): the video tiles lean towards the finger or pointer (a few degrees, sprung back on
+  // release), so the work feels like objects, not flat thumbnails. Transform only, one write per frame per tile.
+  (function tiltTiles() {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var MAX = 6, live = [];
+    function tick() {
+      for (var i = live.length - 1; i >= 0; i--) {
+        var t = live[i];
+        t.x += (t.gx - t.x) * 0.18; t.y += (t.gy - t.y) * 0.18; t.p += (t.gp - t.p) * 0.25;
+        var done = !t.on && Math.abs(t.x) < 0.02 && Math.abs(t.y) < 0.02 && Math.abs(t.p) < 0.002;
+        t.el.style.transform = done ? '' : 'perspective(900px) rotateX(' + t.y.toFixed(2) + 'deg) rotateY(' + t.x.toFixed(2) + 'deg) scale(' + (1 - t.p * 0.03).toFixed(4) + ')';
+        if (done) { t.live = false; live.splice(i, 1); }
+      }
+      if (live.length) requestAnimationFrame(tick);
+    }
+    function state(el) { return el._tilt || (el._tilt = { el: el, x: 0, y: 0, p: 0, gx: 0, gy: 0, gp: 0, on: false, live: false }); }
+    function aim(el, e, press) {
+      var t = state(el), r = el.getBoundingClientRect();
+      var u = (e.clientX - r.left) / r.width - 0.5, v = (e.clientY - r.top) / r.height - 0.5;
+      t.gx = Math.max(-0.5, Math.min(0.5, u)) * 2 * MAX; t.gy = -Math.max(-0.5, Math.min(0.5, v)) * 2 * MAX;
+      if (press !== undefined) t.gp = press ? 1 : 0;
+      t.on = true;
+      if (!t.live) { t.live = true; if (live.push(t) === 1) requestAnimationFrame(tick); }
+    }
+    function rest(el) { var t = el._tilt; if (!t) return; t.gx = t.gy = t.gp = 0; t.on = false; }
+    document.addEventListener('pointermove', function (e) { var el = e.target.closest && e.target.closest('.clip'); if (el) aim(el, e); }, { passive: true });
+    document.addEventListener('pointerdown', function (e) { var el = e.target.closest && e.target.closest('.clip'); if (el) aim(el, e, true); }, { passive: true });
+    ['pointerup', 'pointercancel'].forEach(function (n) { document.addEventListener(n, function (e) { var el = e.target.closest && e.target.closest('.clip'); if (el) { var t = el._tilt; if (t) t.gp = 0; if (e.pointerType !== 'mouse') rest(el); } }, { passive: true }); });
+    document.addEventListener('pointerout', function (e) { var el = e.target.closest && e.target.closest('.clip'); if (el && !el.contains(e.relatedTarget)) rest(el); }, { passive: true });
+  })();
 })();

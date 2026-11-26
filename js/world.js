@@ -1875,7 +1875,8 @@ W removes your group and disposes its geometries after `dispose()`; materials fr
   // fix r4: on a phone the stage is small, so sharpness is cheap: the low tier there renders at the device's pixel
   // ratio up to 2 (it keeps its lighter geometry and has no depth map). Low on a wider screen stays at 1.
   // iPad pass: prCap is the quality watcher's sharpness (1.5, 1.25 or 1 on a 2x screen); see watchQuality()
-  var prCap = 1.5;
+  // iPad round 2 (26 Nov, Tedd: "still lag a bit on the scroll"): a tablet starts one step lighter, at 1.25
+  var prCap = tabletQ ? 1.25 : 1.5;
   function pixelRatio() {
     var d = window.devicePixelRatio || 1;
     // r13 pass A: capped at 1.5 (was 2): about half the pixels on a 2x screen, still sharp at the planet's size
@@ -2814,7 +2815,7 @@ W removes your group and disposes its geometries after `dispose()`; materials fr
   // pushed out of twice. Turning shadows back on rebuilds every material, so that only happens while the page is
   // still. A steady 30 fps (iPad Low Power Mode caps the screen there) only lowers sharpness, never the shadows.
   var Q_STEPS = [{ q: 'high', pr: 1.5 }, { q: 'high', pr: 1.25 }, { q: 'high', pr: 1 }, { q: 'low', pr: 1 }];
-  var qStep = WORLD.quality === 'low' ? 3 : 0, qTop = qStep, qDrops = [0, 0, 0, 0], qWin = [], qGood = 0, qQuietAt = 0;
+  var qStep = WORLD.quality === 'low' ? 3 : (tabletQ ? 1 : 0), qTop = qStep, qDrops = [0, 0, 0, 0], qWin = [], qGood = 0, qQuietAt = 0;
   function qApply(n) {
     var s = Q_STEPS[n];
     qStep = n; prCap = s.pr; qWin = []; qGood = 0; qQuietAt = performance.now() + 1500;
@@ -2832,10 +2833,15 @@ W removes your group and disposes its geometries after `dispose()`; materials fr
       for (var i = 0; i < 40; i++) { sum += qWin[i]; sq += qWin[i] * qWin[i]; }
       var avg = sum / 40, sd = Math.sqrt(Math.max(0, sq / 40 - avg * avg));
       var capped = avg > 30 && avg < 37 && sd < 3;
-      if (avg > 26 && qStep < 3) {
+      // iPad round 2: a small steady stutter also counts: 6+ of the last 40 frames over 25 ms (dropped frames) while
+      // the average is still under 26 ms. That never tripped the old rule, and it is what scrolling felt like.
+      var hitch = 0;
+      for (var k = 0; k < 40; k++) if (qWin[k] > 25) hitch++;
+      if ((avg > 26 || (hitch >= 6 && !capped)) && qStep < 3) {
         var next = qStep + 1;
         if (d <= 1.05 && next < 3) next = 3;            // a 1x screen: sharpness steps change nothing
         if (next === 3 && capped) return;                // a 30 fps cap: shadows stay
+        if (next === 3 && avg <= 26) return;             // round 2: a stutter alone only lowers sharpness, the shadows stay
         qDrops[qStep]++;
         qApply(next);
         return;
@@ -2955,10 +2961,21 @@ W removes your group and disposes its geometries after `dispose()`; materials fr
   }
 
   // ---------- the arrived camera, each frame: the settled framing plus the (gentle, eased) what-if reaction ----------
+  var ORB = 14 * Math.PI / 180, ORB_D = 1.08;
+  function reducedQ() { return reduceQ.matches; }
   var arrived = { pos: new T.Vector3(), look: new T.Vector3(), basePos: new T.Vector3(), baseLook: new T.Vector3(), up: new T.Vector3(0, 1, 0), fov: 34, sh: null, roll: 0, f: null };
   function stepArrived(dt, still, st) {
     var fr = calmFrame(st), f = fxS;
     arrived.f = fr;
+    // grade round 1 (26 Nov, "the planet is a passenger, not a co-star"): while the visitor reads a dived section,
+    // the camera circles its place with the scroll (beat p 0..1 = -ORB..+ORB around the look point's vertical) and
+    // stands a touch further back (ORB_D) so the turned place still fits. Scrubbed, so it is the same both ways.
+    if (!still && !reducedQ()) {
+      var ob = (clamp(beat.p, 0, 1) - 0.5) * 2 * ORB, cb = Math.cos(ob), sb = Math.sin(ob);
+      var ox = fr.pos[0] - fr.look[0], oz = fr.pos[2] - fr.look[2];
+      fr = { pos: [fr.look[0] + (ox * cb + oz * sb) * ORB_D, fr.look[1] + (fr.pos[1] - fr.look[1]) * ORB_D, fr.look[2] + (-ox * sb + oz * cb) * ORB_D],
+             look: fr.look, fov: fr.fov, sx: fr.sx, sy: fr.sy, D: fr.D, youF: fr.youF, el: fr.el, az: fr.az };
+    }
     var pm = PLACE[diveStop].mount;
     pm.updateWorldMatrix(true, false);
     arrived.pos.set(fr.pos[0] + f.x, fr.pos[1] + f.y, fr.pos[2] + f.z).multiplyScalar(KS);
